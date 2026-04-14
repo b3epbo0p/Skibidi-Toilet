@@ -16,6 +16,7 @@ export interface Subject {
 export interface UserData {
   tasks: Task[];
   subjects: Subject[];
+  profilePicture?: string;
 }
 
 export interface User {

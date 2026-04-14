@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { User, Task, Subject, UserData } from '../types';
 import { 
   Plus, 
@@ -14,10 +14,13 @@ import {
   MoreVertical,
   Trash2,
   Edit2,
-  LayoutDashboard
+  LayoutDashboard,
+  Camera,
+  PlusCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import TaskForm from './TaskForm';
+import SubjectForm from './SubjectForm';
 
 interface DashboardProps {
   userData: UserData;
@@ -40,8 +43,10 @@ export default function Dashboard({
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [showTaskForm, setShowTaskForm] = useState(false);
+  const [showSubjectForm, setShowSubjectForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed'>('all');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredTasks = useMemo(() => {
     return userData.tasks
@@ -81,6 +86,18 @@ export default function Dashboard({
     setShowTaskForm(false);
   };
 
+  const handleAddSubject = (subjectData: Omit<Subject, 'id'>) => {
+    const newSubject: Subject = {
+      ...subjectData,
+      id: Math.random().toString(36).substr(2, 9),
+    };
+    onUpdateData({
+      ...userData,
+      subjects: [...userData.subjects, newSubject],
+    });
+    setShowSubjectForm(false);
+  };
+
   const handleEditTask = (taskData: Omit<Task, 'id' | 'createdAt' | 'completed'>) => {
     if (!editingTask) return;
     const updatedTasks = userData.tasks.map(t => 
@@ -106,6 +123,26 @@ export default function Dashboard({
     });
   };
 
+  const handleProfilePictureClick = () => {
+    if (!isDemo) {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        onUpdateData({
+          ...userData,
+          profilePicture: reader.result as string,
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const isOverdue = (dueDate: string) => {
     const now = new Date().setHours(0, 0, 0, 0);
     return new Date(dueDate).getTime() < now;
@@ -115,7 +152,7 @@ export default function Dashboard({
     <div className="flex h-screen overflow-hidden bg-slate-50">
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-slate-200 flex flex-col">
-        <div className="p-6">
+        <div className="p-6 flex-1 overflow-y-auto">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-100">
               <LayoutDashboard className="w-6 h-6 text-white" />
@@ -134,8 +171,17 @@ export default function Dashboard({
               All Tasks
             </button>
             
-            <div className="pt-4 pb-2">
-              <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Subjects</p>
+            <div className="pt-4 pb-2 flex items-center justify-between px-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Subjects</p>
+              {!isDemo && (
+                <button 
+                  onClick={() => setShowSubjectForm(true)}
+                  className="text-blue-600 hover:text-blue-700 transition-colors"
+                  title="Add Subject"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                </button>
+              )}
             </div>
             
             {userData.subjects.map(subject => (
@@ -164,10 +210,29 @@ export default function Dashboard({
           ) : (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center text-slate-600 font-bold uppercase">
-                  {user?.username[0]}
+                <div 
+                  onClick={handleProfilePictureClick}
+                  className="relative group cursor-pointer"
+                >
+                  <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-slate-600 font-bold uppercase overflow-hidden border-2 border-white shadow-sm">
+                    {userData.profilePicture ? (
+                      <img src={userData.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      user?.username[0]
+                    )}
+                  </div>
+                  <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera className="w-4 h-4 text-white" />
+                  </div>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    className="hidden" 
+                    accept="image/*"
+                  />
                 </div>
-                <span className="text-sm font-bold text-slate-700 truncate max-w-[100px]">{user?.username}</span>
+                <span className="text-sm font-bold text-slate-700 truncate max-w-[80px]">{user?.username}</span>
               </div>
               <button
                 onClick={onLogout}
@@ -419,7 +484,14 @@ export default function Dashboard({
             initialData={editingTask || undefined}
           />
         )}
+        {showSubjectForm && (
+          <SubjectForm 
+            onClose={() => setShowSubjectForm(false)}
+            onSubmit={handleAddSubject}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
 }
+
