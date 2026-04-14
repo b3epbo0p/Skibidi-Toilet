@@ -14,7 +14,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [userData, setUserData] = useState<UserData>(getDemoData());
-  const [isDemo, setIsDemo] = useState(true);
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -24,7 +24,7 @@ export default function App() {
       setIsDemo(false);
     } else {
       setUserData(getDemoData());
-      setIsDemo(true);
+      setIsDemo(false);
     }
     setIsAuthReady(true);
   }, []);
@@ -39,7 +39,7 @@ export default function App() {
     logout();
     setUser(null);
     setUserData(getDemoData());
-    setIsDemo(true);
+    setIsDemo(false);
   };
 
   const handleUpdateData = (newData: UserData) => {
