@@ -354,9 +354,11 @@ export default function Dashboard({
                 Hi {user?.username || 'Guest'}! 👋
               </h2>
               <p className="text-slate-500 font-medium">
-                {stats.upcoming > 0 
-                  ? `Focus on your ${stats.upcoming} tasks today.` 
-                  : "You've cleared your schedule! Time to relax? 🍹"}
+                {stats.total - stats.completed > 0 
+                  ? `Focus on your ${stats.total - stats.completed} pending task${stats.total - stats.completed === 1 ? '' : 's'} today.` 
+                  : stats.total > 0 
+                    ? "You've cleared your schedule! Time to relax? 🍹"
+                    : "Add some tasks to get started! 📝"}
               </p>
             </div>
             
