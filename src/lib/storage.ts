@@ -31,6 +31,8 @@ export const signup = (username: string, password: string): User | null => {
         { id: '2', name: 'Science', color: '#10b981' },
         { id: '3', name: 'History', color: '#f59e0b' },
       ],
+      points: 0,
+      streak: 0,
     },
   };
 
@@ -71,13 +73,15 @@ export const updateUserData = (username: string, data: UserData) => {
 // Demo data (not persisted)
 export const getDemoData = (): UserData => ({
   tasks: [
-    { id: 'd1', title: 'Algebra Homework', subjectId: '1', dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], completed: false, createdAt: Date.now() },
-    { id: 'd2', title: 'Lab Report', subjectId: '2', dueDate: new Date(Date.now() - 86400000).toISOString().split('T')[0], completed: false, createdAt: Date.now() },
-    { id: 'd3', title: 'Read Chapter 5', subjectId: '3', dueDate: new Date().toISOString().split('T')[0], completed: true, createdAt: Date.now() },
+    { id: 'd1', title: 'Algebra Homework', subjectId: '1', dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], completed: false, createdAt: Date.now(), difficulty: 'medium' },
+    { id: 'd2', title: 'Lab Report', subjectId: '2', dueDate: new Date(Date.now() - 86400000).toISOString().split('T')[0], completed: false, createdAt: Date.now(), difficulty: 'hard' },
+    { id: 'd3', title: 'Read Chapter 5', subjectId: '3', dueDate: new Date().toISOString().split('T')[0], completed: true, createdAt: Date.now(), difficulty: 'easy', reflection: 'Learned about civil rights.', mood: '😊', pointsEarned: 10 },
   ],
   subjects: [
     { id: '1', name: 'Math', color: '#3b82f6' },
     { id: '2', name: 'Science', color: '#10b981' },
     { id: '3', name: 'History', color: '#f59e0b' },
   ],
+  points: 10,
+  streak: 2,
 });

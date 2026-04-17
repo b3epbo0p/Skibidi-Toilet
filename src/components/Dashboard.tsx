@@ -16,11 +16,17 @@ import {
   Edit2,
   LayoutDashboard,
   Camera,
-  PlusCircle
+  PlusCircle,
+  Flame,
+  Award,
+  Waves,
+  MessageSquare,
+  ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import TaskForm from './TaskForm';
 import SubjectForm from './SubjectForm';
+import ReflectionModal from './ReflectionModal';
 
 interface DashboardProps {
   userData: UserData;
@@ -44,6 +50,7 @@ export default function Dashboard({
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showSubjectForm, setShowSubjectForm] = useState(false);
+  const [reflectingTask, setReflectingTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -114,13 +121,52 @@ export default function Dashboard({
     });
   };
 
-  const toggleComplete = (id: string) => {
+  const handleCompleteWithReflection = (mood: string, reflection: string, points: number) => {
+    if (!reflectingTask) return;
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    let newStreak = userData.streak || 0;
+    
+    // Simple streak logic: if yesterday was the last completion, increment. If today, keep. Otherwise, reset if missed a day (simplified)
+    if (userData.lastCompletionDate !== todayStr) {
+      newStreak += 1;
+    }
+
+    const updatedTasks = userData.tasks.map(t => 
+      t.id === reflectingTask.id ? { 
+        ...t, 
+        completed: true, 
+        mood, 
+        reflection, 
+        pointsEarned: points 
+      } : t
+    );
+
     onUpdateData({
       ...userData,
-      tasks: userData.tasks.map(t => 
-        t.id === id ? { ...t, completed: !t.completed } : t
-      ),
+      tasks: updatedTasks,
+      points: (userData.points || 0) + points,
+      streak: newStreak,
+      lastCompletionDate: todayStr
     });
+    
+    setReflectingTask(null);
+  };
+
+  const toggleComplete = (id: string) => {
+    const task = userData.tasks.find(t => t.id === id);
+    if (task && !task.completed) {
+      // Open reflection modal for finishing a task
+      setReflectingTask(task);
+    } else {
+      // Toggle back to incomplete
+      onUpdateData({
+        ...userData,
+        tasks: userData.tasks.map(t => 
+          t.id === id ? { ...t, completed: false, pointsEarned: 0 } : t
+        ),
+      });
+    }
   };
 
   const handleProfilePictureClick = () => {
@@ -146,6 +192,13 @@ export default function Dashboard({
   const isOverdue = (dueDate: string) => {
     const now = new Date().setHours(0, 0, 0, 0);
     return new Date(dueDate).getTime() < now;
+  };
+
+  const handleMoodSelect = (mood: string) => {
+    onUpdateData({
+      ...userData,
+      currentMood: mood
+    });
   };
 
   return (
@@ -197,9 +250,14 @@ export default function Dashboard({
               </button>
             ))}
           </nav>
+
+          <div className="mt-8 p-4 bg-slate-50 rounded-2xl border border-slate-100 italic text-xs text-slate-500">
+            <p className="font-bold text-slate-700 mb-1">Today's Tip:</p>
+            "Take a 5-minute break for every 25 minutes of focus to keep your energy high!"
+          </div>
         </div>
 
-        <div className="mt-auto p-6 border-t border-slate-100">
+        <div className="mt-auto p-6 border-t border-slate-100 bg-white">
           {isDemo ? (
             <button
               onClick={onLoginClick}
@@ -208,7 +266,7 @@ export default function Dashboard({
               Log In to Save
             </button>
           ) : (
-            <div className="flex items-center justify-between">
+            <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div 
                   onClick={handleProfilePictureClick}
@@ -232,15 +290,18 @@ export default function Dashboard({
                     accept="image/*"
                   />
                 </div>
-                <span className="text-sm font-bold text-slate-700 truncate max-w-[80px]">{user?.username}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-bold text-slate-700 block truncate">{user?.username}</span>
+                  <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Scholar</span>
+                </div>
+                <button
+                  onClick={onLogout}
+                  className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                  title="Logout"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                onClick={onLogout}
-                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                title="Logout"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
             </div>
           )}
         </div>
@@ -249,96 +310,135 @@ export default function Dashboard({
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white border-b border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900">
-                {activeSubjectId 
-                  ? userData.subjects.find(s => s.id === activeSubjectId)?.name 
-                  : 'Dashboard'}
-              </h2>
-              <p className="text-slate-500">
-                You have {stats.upcoming} upcoming tasks.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search tasks..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all w-64"
-                />
+        <header className="bg-white border-b border-slate-200 p-6 shadow-sm z-10">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-orange-50 border border-orange-100 rounded-2xl">
+                <Flame className="w-4 h-4 text-orange-500 fill-orange-500" />
+                <span className="font-black text-orange-700">{userData.streak || 0} Day Streak!</span>
               </div>
+              <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-100 rounded-2xl">
+                <Award className="w-4 h-4 text-blue-500" />
+                <span className="font-black text-blue-700">{userData.points || 0} XP</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
+                {['😊', '😐', '😫', '😴'].map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => handleMoodSelect(m)}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                      userData.currentMood === m ? 'bg-white shadow-md scale-110' : 'hover:bg-white/50 grayscale'
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+              <div className="h-4 w-px bg-slate-200 mx-2" />
               <button
                 onClick={() => setShowTaskForm(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
+                className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-black text-sm flex items-center gap-2 shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95"
               >
-                <Plus className="w-5 h-5" />
-                Add Task
+                <Plus className="w-4 h-4" />
+                NEW TASK
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-4">
-            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-              <p className="text-blue-600 text-sm font-bold uppercase tracking-wider mb-1">Total Tasks</p>
-              <p className="text-3xl font-bold text-blue-900">{stats.total}</p>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h2 className="text-3xl font-black text-slate-900 tracking-tight">
+                Hi {user?.username || 'Guest'}! 👋
+              </h2>
+              <p className="text-slate-500 font-medium">
+                {stats.upcoming > 0 
+                  ? `Focus on your ${stats.upcoming} tasks today.` 
+                  : "You've cleared your schedule! Time to relax? 🍹"}
+              </p>
             </div>
-            <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-              <p className="text-emerald-600 text-sm font-bold uppercase tracking-wider mb-1">Completed</p>
-              <p className="text-3xl font-bold text-emerald-900">{stats.completed}</p>
-            </div>
-            <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
-              <p className="text-amber-600 text-sm font-bold uppercase tracking-wider mb-1">Upcoming</p>
-              <p className="text-3xl font-bold text-amber-900">{stats.upcoming}</p>
-            </div>
-            <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100">
-              <p className="text-rose-600 text-sm font-bold uppercase tracking-wider mb-1">Overdue</p>
-              <p className="text-3xl font-bold text-rose-900">{stats.overdue}</p>
+            
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Find a task..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:bg-white outline-none transition-all w-64 font-medium"
+              />
             </div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200">
+        <div className="flex-1 overflow-y-auto p-8 space-y-8">
+          {/* Energy Level visualization (Waves) */}
+          {stats.total > 0 && (
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-blue-200">
+              <Waves className="absolute -right-8 -bottom-8 w-48 h-48 opacity-10 rotate-12" />
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black">Weekly Progress</h3>
+                  <p className="text-blue-100 text-sm font-medium">You've finished {Math.round((stats.completed / stats.total) * 100)}% of your tasks!</p>
+                  <div className="w-64 h-3 bg-white/20 rounded-full overflow-hidden mt-4">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(stats.completed / (stats.total || 1)) * 100}%` }}
+                      className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]" 
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex gap-4">
+                  <div className="bg-white/10 backdrop-blur-md px-6 py-4 rounded-3xl border border-white/10 text-center min-w-[100px]">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-200">Level</p>
+                    <p className="text-2xl font-black">{Math.floor((userData.points || 0) / 100) + 1}</p>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-md px-6 py-4 rounded-3xl border border-white/10 text-center min-w-[100px]">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-200">Next Reward</p>
+                    <p className="text-2xl font-black">{100 - ((userData.points || 0) % 100)} XP</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
               <button
                 onClick={() => setView('list')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${
-                  view === 'list' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
+                className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all ${
+                  view === 'list' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-500 hover:bg-slate-50'
                 }`}
               >
-                <List className="w-4 h-4" />
+                <List className="w-3.5 h-3.5" />
                 List
               </button>
               <button
                 onClick={() => setView('calendar')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${
-                  view === 'calendar' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
+                className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all ${
+                  view === 'calendar' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-500 hover:bg-slate-50'
                 }`}
               >
-                <CalendarIcon className="w-4 h-4" />
+                <CalendarIcon className="w-3.5 h-3.5" />
                 Calendar
               </button>
             </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-slate-500 font-medium">Filter:</span>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as any)}
-                  className="bg-transparent font-bold text-slate-700 outline-none cursor-pointer"
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2">Showing</span>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
+                className="bg-white border border-slate-200 py-2 px-4 rounded-xl text-xs font-black text-slate-700 outline-none cursor-pointer hover:border-blue-400 transition-colors shadow-sm"
+              >
+                <option value="all">EVERYTHING</option>
+                <option value="active">TO DO</option>
+                <option value="completed">DONE</option>
+              </select>
             </div>
           </div>
 
@@ -349,7 +449,7 @@ export default function Dashboard({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="space-y-3"
+                className="space-y-4"
               >
                 {filteredTasks.length > 0 ? (
                   filteredTasks.map(task => {
@@ -360,45 +460,74 @@ export default function Dashboard({
                       <motion.div
                         layout
                         key={task.id}
-                        className={`group bg-white p-4 rounded-2xl border transition-all hover:shadow-md flex items-center gap-4 ${
-                          task.completed ? 'border-slate-100 opacity-75' : 'border-slate-200'
-                        } ${overdue ? 'border-rose-200 bg-rose-50/30' : ''}`}
+                        className={`group bg-white p-5 rounded-[1.5rem] border transition-all hover:scale-[1.01] flex items-center gap-5 ${
+                          task.completed ? 'border-slate-100 bg-slate-50/50 grayscale' : 'border-slate-200 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-50'
+                        } ${overdue ? 'border-rose-200 bg-rose-50/20' : ''}`}
                       >
                         <button
                           onClick={() => toggleComplete(task.id)}
-                          className={`transition-colors ${
-                            task.completed ? 'text-emerald-500' : overdue ? 'text-rose-400' : 'text-slate-300 hover:text-blue-500'
+                          className={`transition-all active:scale-75 ${
+                            task.completed ? 'text-emerald-500' : overdue ? 'text-rose-400' : 'text-slate-200 group-hover:text-blue-500'
                           }`}
                         >
-                          {task.completed ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
+                          {task.completed ? (
+                            <div className="bg-emerald-100 p-1 rounded-lg">
+                              <CheckCircle2 className="w-7 h-7" />
+                            </div>
+                          ) : (
+                            <Circle className="w-7 h-7 stroke-[1.5]" />
+                          )}
                         </button>
 
                         <div className="flex-1 min-w-0">
-                          <h3 className={`font-bold truncate ${task.completed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
-                            {task.title}
-                          </h3>
-                          <div className="flex items-center gap-3 mt-1">
-                            <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: subject?.color + '20', color: subject?.color }}>
-                              {subject?.name}
-                            </span>
-                            <span className={`flex items-center gap-1 text-xs font-medium ${overdue ? 'text-rose-600' : 'text-slate-500'}`}>
-                              <Clock className="w-3 h-3" />
-                              {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                              {overdue && <span className="ml-1 font-bold">(Overdue)</span>}
+                          <div className="flex items-center gap-3 mb-1">
+                            <h3 className={`font-black text-lg truncate ${task.completed ? 'text-slate-400 line-through' : 'text-slate-900 group-hover:text-blue-600 transition-colors'}`}>
+                              {task.title}
+                            </h3>
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
+                              task.difficulty === 'easy' ? 'bg-emerald-50 text-emerald-600' :
+                              task.difficulty === 'medium' ? 'bg-amber-50 text-amber-600' :
+                              'bg-rose-50 text-rose-600'
+                            }`}>
+                              {task.difficulty}
                             </span>
                           </div>
+                          
+                          <div className="flex flex-wrap items-center gap-4">
+                            <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg" style={{ backgroundColor: subject?.color + '15', color: subject?.color }}>
+                              {subject?.name}
+                            </span>
+                            <span className={`flex items-center gap-1.5 text-xs font-bold ${overdue ? 'text-rose-500' : 'text-slate-400'}`}>
+                              <Clock className="w-3.5 h-3.5" />
+                              {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                              {overdue && <AlertCircle className="w-3.5 h-3.5 ml-1" />}
+                            </span>
+                            {task.completed && task.mood && (
+                              <span className="text-xs bg-slate-100 px-2 py-1 rounded-lg flex items-center gap-1">
+                                <span className="text-sm">{task.mood}</span>
+                                <span className="font-bold text-slate-500">+{task.pointsEarned} XP</span>
+                              </span>
+                            )}
+                          </div>
+                          
+                          {task.completed && task.reflection && (
+                            <div className="mt-3 p-3 bg-white/80 rounded-xl border border-slate-100 flex items-start gap-2">
+                              <MessageSquare className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+                              <p className="text-xs text-slate-500 italic leading-relaxed">"{task.reflection}"</p>
+                            </div>
+                          )}
                         </div>
 
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1 opacity-10 sm:group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => setEditingTask(task)}
-                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                            className="p-2.5 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteTask(task.id)}
-                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            className="p-2.5 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -407,12 +536,12 @@ export default function Dashboard({
                     );
                   })
                 ) : (
-                  <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
-                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Search className="w-8 h-8 text-slate-300" />
+                  <div className="text-center py-20 bg-white rounded-[2rem] border-2 border-dashed border-slate-100">
+                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                      <Search className="w-10 h-10 text-slate-200" />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-900">No tasks found</h3>
-                    <p className="text-slate-500">Try adjusting your filters or add a new task.</p>
+                    <h3 className="text-xl font-black text-slate-900">Nothing here yet!</h3>
+                    <p className="text-slate-400 font-medium">Add a task to start earning points.</p>
                   </div>
                 )}
               </motion.div>
@@ -422,15 +551,14 @@ export default function Dashboard({
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
-                className="bg-white rounded-3xl border border-slate-200 p-8"
+                className="bg-white rounded-[2.5rem] border border-slate-200 p-10 shadow-sm"
               >
-                <div className="grid grid-cols-7 gap-4">
+                <div className="grid grid-cols-7 gap-6">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                    <div key={day} className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest pb-4">
+                    <div key={day} className="text-center text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] pb-6">
                       {day}
                     </div>
                   ))}
-                  {/* Simple Calendar Logic for current month */}
                   {Array.from({ length: 35 }).map((_, i) => {
                     const date = new Date();
                     date.setDate(date.getDate() - date.getDay() + i);
@@ -441,22 +569,23 @@ export default function Dashboard({
                     return (
                       <div 
                         key={i} 
-                        className={`min-h-[100px] p-2 rounded-2xl border transition-all ${
-                          isToday ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-100' : 'bg-slate-50/50 border-slate-100'
+                        className={`min-h-[120px] p-3 rounded-2xl border transition-all ${
+                          isToday ? 'bg-blue-50 border-blue-200 ring-4 ring-blue-50 shadow-inner' : 'bg-slate-50/50 border-transparent hover:border-slate-200'
                         }`}
                       >
-                        <div className={`text-sm font-bold mb-2 ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>
+                        <div className={`text-sm font-black mb-3 ${isToday ? 'text-blue-600' : 'text-slate-300'}`}>
                           {date.getDate()}
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-1.5">
                           {dayTasks.map(task => (
                             <div 
                               key={task.id}
-                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md truncate ${
-                                task.completed ? 'bg-slate-200 text-slate-500 line-through' : 'bg-white text-slate-700 shadow-sm border border-slate-100'
+                              className={`text-[10px] font-black px-2 py-1 rounded-lg truncate flex items-center gap-1 ${
+                                task.completed ? 'bg-slate-100 text-slate-400 line-through' : 'bg-white text-slate-700 shadow-sm border border-slate-200'
                               }`}
                               title={task.title}
                             >
+                              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: userData.subjects.find(s => s.id === task.subjectId)?.color }} />
                               {task.title}
                             </div>
                           ))}
@@ -490,8 +619,17 @@ export default function Dashboard({
             onSubmit={handleAddSubject}
           />
         )}
+        {reflectingTask && (
+          <ReflectionModal
+            task={reflectingTask}
+            username={user?.username || 'Guest'}
+            onClose={() => setReflectingTask(null)}
+            onSubmit={handleCompleteWithReflection}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
 }
+
 

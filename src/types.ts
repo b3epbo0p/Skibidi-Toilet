@@ -5,6 +5,10 @@ export interface Task {
   dueDate: string;
   completed: boolean;
   createdAt: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  mood?: string;
+  reflection?: string;
+  pointsEarned?: number;
 }
 
 export interface Subject {
@@ -17,6 +21,10 @@ export interface UserData {
   tasks: Task[];
   subjects: Subject[];
   profilePicture?: string;
+  points: number;
+  streak: number;
+  lastCompletionDate?: string; // YYYY-MM-DD
+  currentMood?: string;
 }
 
 export interface User {

@@ -24,6 +24,11 @@ export default function Auth({ onLogin, onBackToDemo }: AuthProps) {
       return;
     }
 
+    if (!isLogin && password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return;
+    }
+
     if (isLogin) {
       const user = login(username, password);
       if (user) {
@@ -65,6 +70,7 @@ export default function Auth({ onLogin, onBackToDemo }: AuthProps) {
               <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
               <input
                 type="text"
+                autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
@@ -75,6 +81,7 @@ export default function Auth({ onLogin, onBackToDemo }: AuthProps) {
               <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
               <input
                 type="password"
+                autoComplete={isLogin ? "current-password" : "new-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
